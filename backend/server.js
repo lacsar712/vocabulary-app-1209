@@ -3,6 +3,7 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
+const achievements = require('./achievements');
 const app = express();
 const PORT = 3000;
 const SECRET_KEY = "supersecretkey_vocabulary_1209"; // In prod, use .env
@@ -161,14 +162,50 @@ app.post('/api/test/submit', authenticate, (req, res) => {
     });
     stmt.finalize();
 
-    // Update user vocab size
-    db.run("UPDATE users SET vocab_size = ? WHERE id = ?", [estimatedVocab, req.user.id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({
-            vocab_size: estimatedVocab,
-            correct_count: correctAnswers.length,
-            total_questions: answers.length,
-            accuracy: Math.round((correctAnswers.length / answers.length) * 100)
+    // Get old vocab size for leap achievement check
+    db.get("SELECT vocab_size FROM users WHERE id = ?", [req.user.id], (err, user) => {
+        const oldVocabSize = user?.vocab_size || 0;
+        
+        // Update user vocab size
+        db.run("UPDATE users SET vocab_size = ? WHERE id = ?", [estimatedVocab, req.user.id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            const testResult = {
+                vocab_size: estimatedVocab,
+                correct_count: correctAnswers.length,
+                total_questions: answers.length,
+                accuracy: Math.round((correctAnswers.length / answers.length) * 100)
+            };
+            
+            let allNewAchievements = [];
+            let checksDone = 0;
+            const totalChecks = 2;
+            
+            function checkDone() {
+                checksDone++;
+                if (checksDone === totalChecks) {
+                    const achievementDetails = allNewAchievements.map(a => {
+                        const def = achievements.getAllAchievements().find(ach => ach.id === a.achievement_id);
+                        return { ...a, name: def?.name, description: def?.description, icon: def?.icon };
+                    });
+                    res.json({
+                        ...testResult,
+                        new_achievements: achievementDetails
+                    });
+                }
+            }
+            
+            achievements.checkTestAchievements(req.user.id, testResult, (achErr, newAch) => {
+                if (achErr) console.error('Error checking test achievements:', achErr);
+                allNewAchievements = [...allNewAchievements, ...(newAch || [])];
+                checkDone();
+            });
+            
+            achievements.checkVocabLeapAchievement(req.user.id, oldVocabSize, estimatedVocab, (achErr, newAch) => {
+                if (achErr) console.error('Error checking vocab leap achievement:', achErr);
+                allNewAchievements = [...allNewAchievements, ...(newAch || [])];
+                checkDone();
+            });
         });
     });
 });
@@ -277,7 +314,20 @@ app.post('/api/learn/record', authenticate, (req, res) => {
     const { word_id, status } = req.body; // status: 'learned'
     db.run("INSERT INTO learning_history (user_id, word_id, status) VALUES (?, ?, ?)", [req.user.id, word_id, status || 'learned'], (err) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
+        
+        achievements.checkLearningAchievements(req.user.id, (achErr, newAchievements) => {
+            if (achErr) {
+                console.error('Error checking learning achievements:', achErr);
+                return res.json({ success: true, new_achievements: [] });
+            }
+            
+            const achievementDetails = newAchievements.map(a => {
+                const def = achievements.getAllAchievements().find(ach => ach.id === a.achievement_id);
+                return { ...a, name: def?.name, description: def?.description, icon: def?.icon };
+            });
+            
+            res.json({ success: true, new_achievements: achievementDetails });
+        });
     });
 });
 
@@ -373,6 +423,55 @@ app.get('/api/calendar/day', authenticate, (req, res) => {
             word_count: rows.length,
             words: rows
         });
+    });
+});
+
+// Achievement Routes
+app.get('/api/achievements', authenticate, (req, res) => {
+    console.log('GET /api/achievements called, user:', req.user.id);
+    achievements.getUserAchievements(req.user.id, (err, result) => {
+        if (err) {
+            console.error('Error in /api/achievements:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log('GET /api/achievements success, count:', result.length);
+        res.json(result);
+    });
+});
+
+app.get('/api/achievements/latest', authenticate, (req, res) => {
+    console.log('GET /api/achievements/latest called, user:', req.user.id);
+    achievements.getLatestAchievement(req.user.id, (err, result) => {
+        if (err) {
+            console.error('Error in /api/achievements/latest:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log('GET /api/achievements/latest success, result:', result ? result.achievement_id : null);
+        res.json(result);
+    });
+});
+
+app.get('/api/achievements/unread-count', authenticate, (req, res) => {
+    console.log('GET /api/achievements/unread-count called, user:', req.user.id);
+    achievements.getUnreadCount(req.user.id, (err, count) => {
+        if (err) {
+            console.error('Error in /api/achievements/unread-count:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log('GET /api/achievements/unread-count success, count:', count);
+        res.json({ unread_count: count });
+    });
+});
+
+app.post('/api/achievements/mark-read', authenticate, (req, res) => {
+    console.log('POST /api/achievements/mark-read called, user:', req.user.id);
+    achievements.markAchievementsRead(req.user.id, (err, result) => {
+        if (err) {
+            console.error('Error in /api/achievements/mark-read:', err);
+            return res.status(500).json({ error: err.message });
+        }
+        console.log('POST /api/achievements/mark-read success, changed:', result.changed);
+        res.json(result);
     });
 });
 

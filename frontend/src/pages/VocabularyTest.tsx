@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import type { NewAchievement } from '../api';
 import { X, HelpCircle, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import AchievementPopup from '../components/AchievementPopup';
 
 interface Word {
     id: number;
@@ -23,6 +25,7 @@ interface TestResult {
     correct_count: number;
     total_questions: number;
     accuracy: number;
+    new_achievements?: NewAchievement[];
 }
 
 const TOTAL_QUESTIONS = 15;
@@ -40,6 +43,7 @@ const VocabularyTest: React.FC = () => {
     const [completed, setCompleted] = useState(false);
     const [result, setResult] = useState<TestResult | null>(null);
     const [abilityTrend, setAbilityTrend] = useState<'up' | 'down' | null>(null);
+    const [newAchievements, setNewAchievements] = useState<NewAchievement[]>([]);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -114,6 +118,9 @@ const VocabularyTest: React.FC = () => {
             const res = await api.post('/test/submit', { answers: finalAnswers });
             setResult(res.data);
             setCompleted(true);
+            if (res.data.new_achievements && res.data.new_achievements.length > 0) {
+                setNewAchievements(res.data.new_achievements);
+            }
         } catch (e) {
             console.error(e);
         } finally {
@@ -287,6 +294,11 @@ const VocabularyTest: React.FC = () => {
                     </motion.div>
                 </AnimatePresence>
             </div>
+
+            <AchievementPopup
+                achievements={newAchievements}
+                onClose={() => setNewAchievements([])}
+            />
         </div>
     );
 };

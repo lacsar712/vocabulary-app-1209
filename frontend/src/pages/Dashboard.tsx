@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar } from 'lucide-react';
+import type { NewAchievement } from '../api';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import LearningCalendar from '../components/LearningCalendar';
+import AchievementPopup from '../components/AchievementPopup';
 
 interface RecommendedWord {
     id: number;
@@ -19,13 +21,25 @@ interface RecommendedWord {
     difficulty_level?: number;
 }
 
+interface LatestAchievement {
+    achievement_id: string;
+    name: string;
+    description: string;
+    icon: string;
+    category: string;
+    unlocked_at: string;
+}
+
 const Dashboard: React.FC = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, refreshUser } = useAuth();
     const [word, setWord] = useState<RecommendedWord | null>(null);
     const [stats, setStats] = useState<any>([]);
     const [loading, setLoading] = useState(true);
     const [showReview, setShowReview] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [latestAchievement, setLatestAchievement] = useState<LatestAchievement | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [newAchievements, setNewAchievements] = useState<NewAchievement[]>([]);
     const navigate = useNavigate();
 
     const fetchRecommendation = async () => {
@@ -40,12 +54,25 @@ const Dashboard: React.FC = () => {
     const fetchStats = async () => {
         try {
             const res = await api.get('/stats');
-            // Store full history for review
             const history = res.data.history;
             setStats({
                 chartData: history.map((_: any, i: number) => ({ name: `Day ${i + 1}`, words: i + 1 })),
                 history: history
             });
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchLatestAchievement = async () => {
+        try {
+            const res = await api.get('/achievements/latest');
+            setLatestAchievement(res.data);
+        } catch (e) { console.error(e); }
+    };
+
+    const fetchUnreadCount = async () => {
+        try {
+            const res = await api.get('/achievements/unread-count');
+            setUnreadCount(res.data.unread_count);
         } catch (e) { console.error(e); }
     };
 
@@ -56,7 +83,13 @@ const Dashboard: React.FC = () => {
 
     const refreshData = () => {
         setLoading(true);
-        Promise.all([fetchRecommendation(), fetchStats()]).then(() => setLoading(false));
+        Promise.all([
+            fetchRecommendation(),
+            fetchStats(),
+            fetchLatestAchievement(),
+            fetchUnreadCount(),
+            refreshUser()
+        ]).then(() => setLoading(false));
     };
 
     useEffect(() => {
@@ -66,24 +99,36 @@ const Dashboard: React.FC = () => {
     const handleLearn = async () => {
         if (!word) return;
         try {
-            await api.post('/learn/record', { word_id: word.id, status: 'learned' });
+            const res = await api.post('/learn/record', { word_id: word.id, status: 'learned' });
+            if (res.data.new_achievements && res.data.new_achievements.length > 0) {
+                setNewAchievements(res.data.new_achievements);
+            }
             await fetchRecommendation();
             await fetchStats();
+            await fetchLatestAchievement();
+            await fetchUnreadCount();
         } catch (e) { console.error(e); }
     };
 
     const handleSkip = async () => {
         if (!word) return;
         try {
-            // Mark as skipped so it doesn't appear again immediately
             await api.post('/learn/record', { word_id: word.id, status: 'skipped' });
             await fetchRecommendation();
         } catch (e) { console.error(e); }
     };
 
-    const playAudio = (text?: string) => { // Modified playAudio to accept optional text
+    const playAudio = (text?: string) => {
         const utter = new SpeechSynthesisUtterance(text || word?.word || '');
         window.speechSynthesis.speak(utter);
+    };
+
+    const formatDate = (dateStr: string) => {
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('zh-CN', {
+            month: 'short',
+            day: 'numeric',
+        });
     };
 
     if (loading) return <div className="p-8 text-center text-white">加载主页中...</div>;
@@ -98,6 +143,18 @@ const Dashboard: React.FC = () => {
                     <p className="text-slate-400">当前词汇量: <span className="text-white font-bold">{user?.vocab_size}</span> 词</p>
                 </div>
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/achievements')}
+                        className="relative p-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700 transition cursor-pointer"
+                        title="成就徽章"
+                    >
+                        <Trophy size={20} className="text-amber-400" />
+                        {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center font-bold">
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                        )}
+                    </button>
                     <button onClick={refreshData} title="刷新数据" className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700 transition cursor-pointer">
                         <RefreshCw size={20} className="text-primary" />
                     </button>
@@ -106,6 +163,35 @@ const Dashboard: React.FC = () => {
                     </button>
                 </div>
             </header>
+
+            {latestAchievement && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onClick={() => navigate('/achievements')}
+                    className="max-w-6xl mx-auto mb-6 cursor-pointer"
+                >
+                    <div className="glass-panel p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-orange-500/5 to-purple-500/10 border border-amber-500/20 hover:border-amber-500/40 transition">
+                        <div className="flex items-center gap-4">
+                            <div className="text-4xl">{latestAchievement.icon}</div>
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <Trophy size={16} className="text-amber-400" />
+                                    <span className="text-amber-400 text-sm font-medium">最近获得的成就</span>
+                                </div>
+                                <h3 className="text-white font-bold text-lg">{latestAchievement.name}</h3>
+                                <p className="text-slate-400 text-sm">{latestAchievement.description}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-slate-500 text-xs">
+                                    {formatDate(latestAchievement.unlocked_at)}
+                                </p>
+                                <Award size={20} className="text-amber-400 ml-auto mt-1" />
+                            </div>
+                        </div>
+                    </div>
+                </motion.div>
+            )}
 
             <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
@@ -141,7 +227,7 @@ const Dashboard: React.FC = () => {
                                     <h2 className="text-6xl font-bold text-white tracking-tight">{word.word}</h2>
                                     <span className="text-2xl text-slate-400 italic font-serif">{word.pos}</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-primary cursor-pointer hover:text-indigo-400 transition" onClick={() => playAudio()}> {/* Updated playAudio call */}
+                                <div className="flex items-center gap-2 text-primary cursor-pointer hover:text-indigo-400 transition" onClick={() => playAudio()}>
                                     <Volume2 size={24} />
                                     <span className="text-lg font-mono">{word.pronunciation}</span>
                                 </div>
@@ -185,7 +271,7 @@ const Dashboard: React.FC = () => {
                         </h3>
                         <div className="h-48 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={stats.chartData ? stats.chartData : [{ name: 'Start', words: 0 }]}> {/* Updated data prop */}
+                                <LineChart data={stats.chartData ? stats.chartData : [{ name: 'Start', words: 0 }]}>
                                     <XAxis dataKey="name" hide />
                                     <YAxis hide />
                                     <Tooltip
@@ -197,13 +283,26 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div className="flex justify-between mt-4 text-sm text-slate-400">
                             <span>今日已学</span>
-                            <span className="text-white font-bold">{stats.history ? stats.history.length : 0} 词</span> {/* Updated count */}
+                            <span className="text-white font-bold">{stats.history ? stats.history.length : 0} 词</span>
                         </div>
                     </div>
 
                     <div className="glass-panel p-6 rounded-2xl bg-gradient-to-br from-indigo-900/20 to-purple-900/20">
                         <h3 className="text-lg font-bold text-white mb-4">快捷操作</h3>
                         <div className="space-y-3">
+                            <button
+                                onClick={() => navigate('/achievements')}
+                                className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition text-slate-300 hover:text-white flex items-center gap-3"
+                            >
+                                <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                <Trophy size={18} />
+                                成就徽章
+                                {unreadCount > 0 && (
+                                    <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                                        {unreadCount} 新
+                                    </span>
+                                )}
+                            </button>
                             <button
                                 onClick={() => setShowCalendar(true)}
                                 className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition text-slate-300 hover:text-white flex items-center gap-3"
@@ -230,7 +329,6 @@ const Dashboard: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Review Modal */}
                 {showReview && (
                     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowReview(false)}>
                         <div className="glass-panel bg-slate-900 p-6 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -260,13 +358,17 @@ const Dashboard: React.FC = () => {
                     </div>
                 )}
 
-                {/* Learning Calendar Modal */}
                 <AnimatePresence>
                     {showCalendar && (
                         <LearningCalendar onClose={() => setShowCalendar(false)} />
                     )}
                 </AnimatePresence>
             </div>
+
+            <AchievementPopup
+                achievements={newAchievements}
+                onClose={() => setNewAchievements([])}
+            />
         </div>
     );
 };

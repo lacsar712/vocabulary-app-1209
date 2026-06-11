@@ -142,6 +142,17 @@ db.serialize(() => {
         FOREIGN KEY(word_id) REFERENCES words(id)
     )`);
 
+    // User Achievements
+    db.run(`CREATE TABLE IF NOT EXISTS user_achievements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        achievement_id TEXT,
+        unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        is_read INTEGER DEFAULT 0,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, achievement_id)
+    )`);
+
     // Seed Data with UPSERT - delay to ensure migration completes
     setTimeout(() => {
         const stmt = db.prepare(`
