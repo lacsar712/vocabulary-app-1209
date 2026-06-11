@@ -297,6 +297,84 @@ app.get('/api/stats', authenticate, (req, res) => {
     });
 });
 
+// Learning Calendar - Get daily aggregated data for a month
+app.get('/api/calendar', authenticate, (req, res) => {
+    const { year, month } = req.query;
+    
+    if (!year || !month) {
+        return res.status(400).json({ error: "Year and month are required" });
+    }
+
+    const yearNum = parseInt(year);
+    const monthNum = parseInt(month);
+    
+    const startDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+    const endDate = `${yearNum}-${String(monthNum).padStart(2, '0')}-31`;
+
+    const sql = `
+        SELECT 
+            DATE(lh.updated_at) as date,
+            COUNT(DISTINCT lh.word_id) as word_count
+        FROM learning_history lh
+        WHERE lh.user_id = ?
+        AND lh.status = 'learned'
+        AND DATE(lh.updated_at) BETWEEN ? AND ?
+        GROUP BY DATE(lh.updated_at)
+        ORDER BY date ASC
+    `;
+
+    db.all(sql, [req.user.id, startDate, endDate], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        
+        const dailyData = {};
+        rows.forEach(row => {
+            dailyData[row.date] = row.word_count;
+        });
+        
+        res.json({
+            year: yearNum,
+            month: monthNum,
+            daily_data: dailyData
+        });
+    });
+});
+
+// Learning Calendar - Get detailed words for a specific day
+app.get('/api/calendar/day', authenticate, (req, res) => {
+    const { date } = req.query;
+    
+    if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+    }
+
+    const sql = `
+        SELECT 
+            lh.id,
+            lh.word_id,
+            lh.status,
+            lh.updated_at,
+            w.word,
+            w.pronunciation,
+            w.pos,
+            w.definition,
+            w.example
+        FROM learning_history lh
+        JOIN words w ON lh.word_id = w.id
+        WHERE lh.user_id = ?
+        AND lh.status = 'learned'
+        AND DATE(lh.updated_at) = ?
+        ORDER BY lh.updated_at DESC
+    `;
+
+    db.all(sql, [req.user.id, date], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({
+            date: date,
+            word_count: rows.length,
+            words: rows
+        });
+    });
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

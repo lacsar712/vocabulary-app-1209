@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import LearningCalendar from '../components/LearningCalendar';
 
 interface RecommendedWord {
     id: number;
@@ -23,8 +24,9 @@ const Dashboard: React.FC = () => {
     const [word, setWord] = useState<RecommendedWord | null>(null);
     const [stats, setStats] = useState<any>([]);
     const [loading, setLoading] = useState(true);
-    const [showReview, setShowReview] = useState(false); // Added showReview state
-    const navigate = useNavigate(); // Initialized useNavigate
+    const [showReview, setShowReview] = useState(false);
+    const [showCalendar, setShowCalendar] = useState(false);
+    const navigate = useNavigate();
 
     const fetchRecommendation = async () => {
         try {
@@ -203,14 +205,22 @@ const Dashboard: React.FC = () => {
                         <h3 className="text-lg font-bold text-white mb-4">快捷操作</h3>
                         <div className="space-y-3">
                             <button
-                                onClick={() => setShowReview(true)} // Added onClick handler
+                                onClick={() => setShowCalendar(true)}
+                                className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition text-slate-300 hover:text-white flex items-center gap-3"
+                            >
+                                <span className="w-2 h-2 rounded-full bg-primary"></span>
+                                <Calendar size={18} />
+                                学习日历
+                            </button>
+                            <button
+                                onClick={() => setShowReview(true)}
                                 className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition text-slate-300 hover:text-white flex items-center gap-3"
                             >
                                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                                 复习已掌握单词
                             </button>
                             <button
-                                onClick={() => navigate('/test')} // Added onClick handler
+                                onClick={() => navigate('/test')}
                                 className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition text-slate-300 hover:text-white flex items-center gap-3"
                             >
                                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
@@ -249,6 +259,13 @@ const Dashboard: React.FC = () => {
                         </div>
                     </div>
                 )}
+
+                {/* Learning Calendar Modal */}
+                <AnimatePresence>
+                    {showCalendar && (
+                        <LearningCalendar onClose={() => setShowCalendar(false)} />
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );
