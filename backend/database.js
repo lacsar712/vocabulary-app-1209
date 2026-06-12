@@ -198,6 +198,34 @@ db.serialize(() => {
         UNIQUE(user_id, word_id)
     )`);
 
+    // Daily Challenge Questions - stores the 5 daily questions for each date
+    db.run(`CREATE TABLE IF NOT EXISTS daily_challenge_questions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        challenge_date TEXT NOT NULL,
+        question_index INTEGER NOT NULL,
+        question_type TEXT NOT NULL,
+        word_id INTEGER NOT NULL,
+        options TEXT,
+        correct_answer TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(word_id) REFERENCES words(id),
+        UNIQUE(challenge_date, question_index)
+    )`);
+
+    // Daily Challenge Submissions - stores user submissions (one per day per user)
+    db.run(`CREATE TABLE IF NOT EXISTS daily_challenge_submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        challenge_date TEXT NOT NULL,
+        score INTEGER NOT NULL,
+        total_questions INTEGER NOT NULL,
+        time_spent INTEGER NOT NULL,
+        answers TEXT NOT NULL,
+        submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, challenge_date)
+    )`);
+
     // Seed Data with UPSERT - delay to ensure migration completes
     setTimeout(() => {
         const stmt = db.prepare(`

@@ -9,6 +9,7 @@ import AchievementsPage from './pages/AchievementsPage';
 import WordListsPage from './pages/WordListsPage';
 import WordListDetailPage from './pages/WordListDetailPage';
 import ReadingPracticePage from './pages/ReadingPracticePage';
+import DailyChallengePage from './pages/DailyChallengePage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated } = useAuth();
@@ -47,6 +48,11 @@ function App() {
               <Route path="/reading-practice" element={
                 <ProtectedRoute>
                   <ReadingPracticePage />
+                </ProtectedRoute>
+              } />
+              <Route path="/daily-challenge" element={
+                <ProtectedRoute>
+                  <DailyChallengePage />
                 </ProtectedRoute>
               } />
               <Route path="/" element={

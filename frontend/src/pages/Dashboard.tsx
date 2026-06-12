@@ -4,11 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { useWordList } from '../context/WordListContext';
 import api from '../api';
 import type { NewAchievement } from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic } from 'lucide-react';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import LearningCalendar from '../components/LearningCalendar';
 import AchievementPopup from '../components/AchievementPopup';
+import DailyChallengeCard from '../components/DailyChallengeCard';
 
 interface RecommendedWord {
     id: number;
@@ -395,6 +396,8 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     <div className="space-y-8">
+                        <DailyChallengeCard />
+
                         <div className="glass-panel p-6 rounded-2xl">
                             <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                                 <BarChart2 size={20} className="text-secondary" />
@@ -421,6 +424,14 @@ const Dashboard: React.FC = () => {
                         <div className="glass-panel p-6 rounded-2xl bg-gradient-to-br from-indigo-900/20 to-purple-900/20">
                             <h3 className="text-lg font-bold text-white mb-4">快捷操作</h3>
                             <div className="space-y-3">
+                                <button
+                                    onClick={() => navigate('/daily-challenge')}
+                                    className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 hover:from-orange-500/30 hover:to-red-500/30 border border-orange-500/30 transition text-white flex items-center gap-3"
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-orange-400"></span>
+                                    <Flame size={18} />
+                                    今日挑战
+                                </button>
                                 <button
                                     onClick={() => navigate('/reading-practice')}
                                     className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-primary/20 to-accent/20 hover:from-primary/30 hover:to-accent/30 border border-primary/30 transition text-white flex items-center gap-3"

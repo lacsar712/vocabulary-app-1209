@@ -113,4 +113,69 @@ export const readingApi = {
         api.get<ReadingStats>('/reading/stats'),
 };
 
+export type QuestionType = 'word_choice' | 'definition_fill' | 'audio_recognition';
+
+export interface ChallengeWord {
+    id: number;
+    word: string;
+    pronunciation: string;
+    pos: string;
+    definition: string;
+    example: string;
+    rank: number;
+    difficulty_level: number;
+}
+
+export interface ChallengeQuestion {
+    id: number;
+    index: number;
+    type: QuestionType;
+    word: ChallengeWord;
+    options: string[] | null;
+    correct_answer?: string;
+}
+
+export interface ChallengeAnswer {
+    question_index: number;
+    question_type: QuestionType;
+    word_id: number;
+    word: string;
+    definition: string;
+    user_answer: string;
+    correct_answer: string;
+    is_correct: boolean;
+}
+
+export interface ChallengeSubmission {
+    score: number;
+    total_questions: number;
+    time_spent: number;
+    answers: ChallengeAnswer[];
+    submitted_at?: string;
+}
+
+export interface DailyChallengeResponse {
+    status: 'available' | 'completed';
+    questions: ChallengeQuestion[];
+    submission?: ChallengeSubmission;
+}
+
+export interface DailyChallengeStats {
+    date: string;
+    completed_count: number;
+    avg_score: number;
+    avg_time: number;
+}
+
+export const dailyChallengeApi = {
+    getChallenge: () =>
+        api.get<DailyChallengeResponse>('/daily-challenge'),
+    
+    submitChallenge: (answers: string[], timeSpent: number) =>
+        api.post<ChallengeSubmission>('/daily-challenge/submit', { answers, time_spent: timeSpent }),
+    
+    getStats: () =>
+        api.get<DailyChallengeStats>('/daily-challenge/stats'),
+};
+
 export default api;
