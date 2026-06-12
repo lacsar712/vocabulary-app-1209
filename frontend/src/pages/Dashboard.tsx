@@ -4,12 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { useWordList } from '../context/WordListContext';
 import api, { etymologyApi } from '../api';
 import type { NewAchievement, EtymologyWordCheckResponse } from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info } from 'lucide-react';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import LearningCalendar from '../components/LearningCalendar';
 import AchievementPopup from '../components/AchievementPopup';
 import DailyChallengeCard from '../components/DailyChallengeCard';
+import ShareCard from '../components/ShareCard';
 
 interface RecommendedWord {
     id: number;
@@ -43,6 +44,7 @@ const Dashboard: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [showReview, setShowReview] = useState(false);
     const [showCalendar, setShowCalendar] = useState(false);
+    const [showShareCard, setShowShareCard] = useState(false);
     const [latestAchievement, setLatestAchievement] = useState<LatestAchievement | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const [newAchievements, setNewAchievements] = useState<NewAchievement[]>([]);
@@ -577,6 +579,14 @@ const Dashboard: React.FC = () => {
                                     )}
                                 </button>
                                 <button
+                                    onClick={() => setShowShareCard(true)}
+                                    className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-purple-500/20 to-pink-500/20 hover:from-purple-500/30 hover:to-pink-500/30 border border-purple-500/30 transition text-white flex items-center gap-3"
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-pink-400"></span>
+                                    <Share2 size={18} />
+                                    分享学习成果
+                                </button>
+                                <button
                                     onClick={() => setShowCalendar(true)}
                                     className="w-full text-left p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition text-slate-300 hover:text-white flex items-center gap-3"
                                 >
@@ -634,6 +644,12 @@ const Dashboard: React.FC = () => {
                     <AnimatePresence>
                         {showCalendar && (
                             <LearningCalendar onClose={() => setShowCalendar(false)} />
+                        )}
+                    </AnimatePresence>
+
+                    <AnimatePresence>
+                        {showShareCard && (
+                            <ShareCard onClose={() => setShowShareCard(false)} />
                         )}
                     </AnimatePresence>
                 </div>
