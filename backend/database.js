@@ -226,6 +226,40 @@ db.serialize(() => {
         UNIQUE(user_id, challenge_date)
     )`);
 
+    db.run(`CREATE TABLE IF NOT EXISTS crossword_puzzles (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        puzzle_date TEXT NOT NULL,
+        grid TEXT NOT NULL,
+        clues_across TEXT NOT NULL,
+        clues_down TEXT NOT NULL,
+        words TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(puzzle_date)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS crossword_submissions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        puzzle_date TEXT NOT NULL,
+        time_spent INTEGER NOT NULL,
+        hints_used INTEGER DEFAULT 0,
+        is_correct INTEGER DEFAULT 0,
+        submitted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id, puzzle_date)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS crossword_best_scores (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        best_time INTEGER NOT NULL,
+        best_hints INTEGER DEFAULT 0,
+        best_date TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        UNIQUE(user_id)
+    )`);
+
     // Etymology Entries - 词源百科条目
     db.run(`CREATE TABLE IF NOT EXISTS etymology_entries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

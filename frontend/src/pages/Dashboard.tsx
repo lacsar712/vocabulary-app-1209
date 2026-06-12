@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWordList } from '../context/WordListContext';
 import api, { etymologyApi } from '../api';
 import type { NewAchievement, EtymologyWordCheckResponse } from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info, Share2 } from 'lucide-react';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info, Share2, Grid3X3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import LearningCalendar from '../components/LearningCalendar';
@@ -540,6 +540,14 @@ const Dashboard: React.FC = () => {
                                     <span className="w-2 h-2 rounded-full bg-orange-400"></span>
                                     <Flame size={18} />
                                     今日挑战
+                                </button>
+                                <button
+                                    onClick={() => navigate('/crossword')}
+                                    className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-cyan-500/20 to-blue-500/20 hover:from-cyan-500/30 hover:to-blue-500/30 border border-cyan-500/30 transition text-white flex items-center gap-3"
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+                                    <Grid3X3 size={18} />
+                                    填字游戏
                                 </button>
                                 <button
                                     onClick={() => navigate('/reading-practice')}

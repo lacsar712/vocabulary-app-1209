@@ -298,4 +298,81 @@ export const etymologyApi = {
         api.get<EtymologyStats>('/etymology/stats/summary'),
 };
 
+export interface CrosswordClue {
+    row: number;
+    col: number;
+    direction: 'across' | 'down';
+    clue: string;
+    word_length: number;
+    word_id: number | null;
+}
+
+export interface CrosswordSubmission {
+    time_spent: number;
+    hints_used: number;
+    is_correct: number;
+}
+
+export interface CrosswordResponse {
+    date: string;
+    grid: (string | null)[][];
+    clues_across: CrosswordClue[];
+    clues_down: CrosswordClue[];
+    submission: CrosswordSubmission | null;
+}
+
+export interface CrosswordCellResult {
+    expected: string;
+    actual: string;
+    correct: boolean;
+    empty: boolean;
+}
+
+export interface CrosswordSubmitResponse {
+    is_correct: boolean;
+    cell_results: CrosswordCellResult[][];
+    time_spent: number;
+    hints_used: number;
+}
+
+export interface CrosswordBestScore {
+    best_time: number | null;
+    best_hints: number | null;
+    best_date: string | null;
+}
+
+export interface CrosswordHintCell {
+    hint: string | null;
+}
+
+export interface CrosswordHintClue {
+    hint: {
+        word: string;
+        clue: string;
+        direction: string;
+        row: number;
+        col: number;
+    } | null;
+}
+
+export const crosswordApi = {
+    getPuzzle: () =>
+        api.get<CrosswordResponse>('/crossword'),
+
+    submitPuzzle: (answers: string[][], timeSpent: number, hintsUsed: number) =>
+        api.post<CrosswordSubmitResponse>('/crossword/submit', {
+            answers,
+            time_spent: timeSpent,
+            hints_used: hintsUsed
+        }),
+
+    getBestScore: () =>
+        api.get<CrosswordBestScore>('/crossword/best'),
+
+    getHint: (type: 'cell' | 'clue', row?: number, col?: number) =>
+        api.get<CrosswordHintCell | CrosswordHintClue>('/crossword/hint', {
+            params: { type, row, col }
+        }),
+};
+
 export default api;

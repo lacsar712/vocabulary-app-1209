@@ -12,6 +12,7 @@ import ReadingPracticePage from './pages/ReadingPracticePage';
 import DailyChallengePage from './pages/DailyChallengePage';
 import EtymologyPage from './pages/EtymologyPage';
 import EtymologyDetailPage from './pages/EtymologyDetailPage';
+import CrosswordPage from './pages/CrosswordPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated } = useAuth();
@@ -70,6 +71,11 @@ function App() {
               <Route path="/etymology/word/:wordId" element={
                 <ProtectedRoute>
                   <EtymologyDetailPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/crossword" element={
+                <ProtectedRoute>
+                  <CrosswordPage />
                 </ProtectedRoute>
               } />
               <Route path="/" element={
