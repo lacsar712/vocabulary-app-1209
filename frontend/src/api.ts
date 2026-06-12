@@ -375,4 +375,135 @@ export const crosswordApi = {
         }),
 };
 
+// ==================== Admin Types ====================
+
+export interface AdminWord {
+    id: number;
+    word: string;
+    pronunciation: string;
+    pos: string;
+    definition: string;
+    example: string;
+    rank: number | null;
+    frequency: number;
+    difficulty_level: number;
+    tags: string;
+    updated_at: string;
+}
+
+export interface AdminWordListResponse {
+    total: number;
+    limit: number;
+    offset: number;
+    data: AdminWord[];
+}
+
+export interface AdminWordFormData {
+    word: string;
+    pronunciation?: string;
+    pos?: string;
+    definition: string;
+    example?: string;
+    rank?: number | null;
+    frequency?: number;
+    difficulty_level?: number;
+    tags?: string;
+}
+
+export interface AdminTag {
+    id: number;
+    tag: string;
+    created_at: string;
+}
+
+export interface AdminAuditLog {
+    id: number;
+    admin_id: number;
+    admin_username: string;
+    action: string;
+    target_type: string;
+    target_id: number | null;
+    details: Record<string, unknown> | null;
+    created_at: string;
+}
+
+export interface AdminAuditLogResponse {
+    total: number;
+    limit: number;
+    offset: number;
+    data: AdminAuditLog[];
+}
+
+export interface AdminStats {
+    total_words: number;
+    difficulty_distribution: { difficulty_level: number; count: number }[];
+    recent_changes: AdminAuditLog[];
+}
+
+export interface AdminCsvImportResult {
+    success: boolean;
+    success_count: number;
+    error_count: number;
+    errors: string[];
+}
+
+export const adminApi = {
+    checkAdmin: () =>
+        api.get<{ is_admin: boolean; user: { id: number; username: string; role: string } }>('/admin/check'),
+
+    getStats: () =>
+        api.get<AdminStats>('/admin/stats'),
+
+    getAuditLog: (params?: { limit?: number; offset?: number; action?: string }) =>
+        api.get<AdminAuditLogResponse>('/admin/audit-log', { params }),
+
+    getTags: () =>
+        api.get<AdminTag[]>('/admin/tags'),
+
+    createTag: (tag: string) =>
+        api.post<AdminTag>('/admin/tags', { tag }),
+
+    deleteTag: (id: number) =>
+        api.delete<{ success: boolean }>(`/admin/tags/${id}`),
+
+    getWords: (params?: {
+        q?: string;
+        difficulty?: string;
+        tag?: string;
+        limit?: number;
+        offset?: number;
+        sort_by?: 'id' | 'word' | 'difficulty_level' | 'frequency' | 'rank' | 'updated_at';
+        sort_order?: 'asc' | 'desc';
+    }) =>
+        api.get<AdminWordListResponse>('/admin/words', { params }),
+
+    getWord: (id: number) =>
+        api.get<AdminWord>(`/admin/words/${id}`),
+
+    createWord: (data: AdminWordFormData) =>
+        api.post<AdminWord>('/admin/words', data),
+
+    updateWord: (id: number, data: AdminWordFormData) =>
+        api.put<AdminWord>(`/admin/words/${id}`, data),
+
+    deleteWord: (id: number) =>
+        api.delete<{ success: boolean }>(`/admin/words/${id}`),
+
+    batchDeleteWords: (ids: number[]) =>
+        api.post<{ success: boolean; deleted_count: number }>('/admin/words/batch-delete', { ids }),
+
+    exportCsv: (params?: { difficulty?: string; tag?: string; q?: string }) => {
+        const query = new URLSearchParams();
+        if (params?.difficulty) query.append('difficulty', params.difficulty);
+        if (params?.tag) query.append('tag', params.tag);
+        if (params?.q) query.append('q', params.q);
+        return api.get(`/admin/words/export/csv?${query.toString()}`, {
+            responseType: 'blob'
+        });
+    },
+
+    importCsv: (content: string) =>
+        api.post<AdminCsvImportResult>('/admin/words/import/csv', { content }),
+};
+
 export default api;

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWordList } from '../context/WordListContext';
 import api, { etymologyApi } from '../api';
 import type { NewAchievement, EtymologyWordCheckResponse } from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info, Share2, Grid3X3 } from 'lucide-react';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info, Share2, Grid3X3, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import LearningCalendar from '../components/LearningCalendar';
@@ -37,7 +37,7 @@ interface LatestAchievement {
 }
 
 const Dashboard: React.FC = () => {
-    const { user, logout, refreshUser } = useAuth();
+    const { user, logout, refreshUser, isAdmin } = useAuth();
     const { activeList, clearActiveList, refreshActiveList } = useWordList();
     const [word, setWord] = useState<RecommendedWord | null>(null);
     const [stats, setStats] = useState<any>([]);
@@ -246,6 +246,16 @@ const Dashboard: React.FC = () => {
                         <p className="text-slate-400">当前词汇量: <span className="text-white font-bold">{user?.vocab_size}</span> 词</p>
                     </div>
                     <div className="flex items-center gap-4">
+                        {isAdmin && (
+                            <button
+                                onClick={() => navigate('/admin')}
+                                className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:border-amber-500/50 transition text-amber-400 hover:text-amber-300 font-medium flex items-center gap-2"
+                                title="词库管理后台"
+                            >
+                                <Shield size={18} />
+                                <span className="hidden sm:inline">管理后台</span>
+                            </button>
+                        )}
                         <button
                             onClick={() => navigate('/word-lists')}
                             className="p-2 rounded-full bg-slate-800 border border-slate-700 hover:bg-slate-700 transition cursor-pointer"
@@ -533,6 +543,16 @@ const Dashboard: React.FC = () => {
                         <div className="glass-panel p-6 rounded-2xl bg-gradient-to-br from-indigo-900/20 to-purple-900/20">
                             <h3 className="text-lg font-bold text-white mb-4">快捷操作</h3>
                             <div className="space-y-3">
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => navigate('/admin')}
+                                        className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/30 transition text-white flex items-center gap-3"
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                                        <Shield size={18} />
+                                        词库管理后台
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => navigate('/daily-challenge')}
                                     className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 hover:from-orange-500/30 hover:to-red-500/30 border border-orange-500/30 transition text-white flex items-center gap-3"

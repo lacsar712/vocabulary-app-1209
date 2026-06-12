@@ -5,6 +5,7 @@ interface User {
     id: number;
     username: string;
     vocab_size: number;
+    role?: string;
 }
 
 interface AuthContextType {
@@ -12,6 +13,7 @@ interface AuthContextType {
     login: (token: string, user: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
+    isAdmin: boolean;
     refreshUser: () => Promise<void>;
 }
 
@@ -53,10 +55,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    const isAdmin = user?.role === 'admin';
+
     if (loading) return <div className="min-h-screen flex items-center justify-center bg-background text-primary">Loading...</div>;
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, refreshUser }}>
+        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isAdmin, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

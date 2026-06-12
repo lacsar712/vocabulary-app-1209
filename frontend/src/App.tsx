@@ -13,10 +13,20 @@ import DailyChallengePage from './pages/DailyChallengePage';
 import EtymologyPage from './pages/EtymologyPage';
 import EtymologyDetailPage from './pages/EtymologyDetailPage';
 import CrosswordPage from './pages/CrosswordPage';
+import NoPermissionPage from './pages/NoPermissionPage';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminWordsPage from './pages/AdminWordsPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? children : <Navigate to="/login" />;
+};
+
+const AdminRoute = ({ children }: { children: React.ReactElement }) => {
+  const { isAuthenticated, isAdmin } = useAuth();
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAdmin) return <Navigate to="/no-permission" />;
+  return children;
 };
 
 function App() {
@@ -28,6 +38,7 @@ function App() {
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/no-permission" element={<NoPermissionPage />} />
               <Route path="/test" element={
                 <ProtectedRoute>
                   <VocabularyTest />
@@ -77,6 +88,16 @@ function App() {
                 <ProtectedRoute>
                   <CrosswordPage />
                 </ProtectedRoute>
+              } />
+              <Route path="/admin" element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              } />
+              <Route path="/admin/words" element={
+                <AdminRoute>
+                  <AdminWordsPage />
+                </AdminRoute>
               } />
               <Route path="/" element={
                 <ProtectedRoute>

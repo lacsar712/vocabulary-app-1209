@@ -79,6 +79,7 @@ db.serialize(() => {
         username TEXT UNIQUE,
         password_hash TEXT,
         vocab_size INTEGER DEFAULT 0,
+        role TEXT DEFAULT 'user',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -92,7 +93,29 @@ db.serialize(() => {
         example TEXT,
         rank INTEGER,
         frequency INTEGER DEFAULT 5,
-        difficulty_level INTEGER DEFAULT 3
+        difficulty_level INTEGER DEFAULT 3,
+        tags TEXT DEFAULT '',
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Word Tags table
+    db.run(`CREATE TABLE IF NOT EXISTS word_tags (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tag TEXT UNIQUE NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    // Admin Audit Log table
+    db.run(`CREATE TABLE IF NOT EXISTS admin_audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        admin_id INTEGER NOT NULL,
+        admin_username TEXT NOT NULL,
+        action TEXT NOT NULL,
+        target_type TEXT NOT NULL,
+        target_id INTEGER,
+        details TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(admin_id) REFERENCES users(id)
     )`);
 
     // Migration: Add new columns if they don't exist
@@ -117,7 +140,77 @@ db.serialize(() => {
                 else console.log('Added difficulty_level column to words table');
             });
         }
+
+        if (!columnNames.includes('tags')) {
+            db.run("ALTER TABLE words ADD COLUMN tags TEXT DEFAULT ''", (err) => {
+                if (err) console.error('Error adding tags column:', err);
+                else console.log('Added tags column to words table');
+            });
+        }
+
+        if (!columnNames.includes('updated_at')) {
+            db.run("ALTER TABLE words ADD COLUMN updated_at DATETIME", (err) => {
+                if (err) {
+                    console.error('Error adding updated_at column:', err);
+                } else {
+                    console.log('Added updated_at column to words table');
+                    db.run("UPDATE words SET updated_at = CURRENT_TIMESTAMP WHERE updated_at IS NULL", (updErr) => {
+                        if (updErr) console.error('Error setting default updated_at values:', updErr);
+                        else console.log('Updated existing words with default updated_at values');
+                    });
+                }
+            });
+        }
     });
+
+    // Migration: Add role column to users table if not exists
+    db.all("PRAGMA table_info(users)", (err, columns) => {
+        if (err) {
+            console.error('Error checking users table info:', err);
+            return;
+        }
+
+        const columnNames = columns.map(c => c.name);
+
+        if (!columnNames.includes('role')) {
+            db.run("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'", (err) => {
+                if (err) console.error('Error adding role column to users:', err);
+                else {
+                    console.log('Added role column to users table');
+                    // Create default admin account
+                    const bcrypt = require('bcryptjs');
+                    const adminHash = bcrypt.hashSync('admin123', 10);
+                    db.run(`INSERT OR IGNORE INTO users (username, password_hash, vocab_size, role) VALUES (?, ?, ?, ?)`, 
+                        ['admin', adminHash, 0, 'admin'], 
+                        (err) => {
+                            if (err) console.error('Error creating default admin:', err);
+                            else console.log('Default admin account created (username: admin, password: admin123)');
+                        }
+                    );
+                }
+            });
+        } else {
+            // Ensure default admin exists even if column already exists
+            const bcrypt = require('bcryptjs');
+            const adminHash = bcrypt.hashSync('admin123', 10);
+            db.run(`INSERT OR IGNORE INTO users (username, password_hash, vocab_size, role) VALUES (?, ?, ?, ?)`, 
+                ['admin', adminHash, 0, 'admin'], 
+                (err) => {
+                    if (err) console.error('Error creating default admin:', err);
+                    else console.log('Default admin account ensured');
+                }
+            );
+        }
+    });
+
+    // Seed default tags
+    setTimeout(() => {
+        const defaultTags = ['托福', '雅思', 'GRE', 'GMAT', '四级', '六级', '考研', '商务英语', '日常口语', '学术词汇', '科技', '经济', '医学', '法律'];
+        const tagStmt = db.prepare(`INSERT OR IGNORE INTO word_tags (tag) VALUES (?)`);
+        defaultTags.forEach(t => tagStmt.run(t));
+        tagStmt.finalize();
+        console.log('Default tags seeded');
+    }, 1500);
 
     // Test history table for adaptive testing
     db.run(`CREATE TABLE IF NOT EXISTS test_history (
