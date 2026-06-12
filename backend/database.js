@@ -175,6 +175,29 @@ db.serialize(() => {
         UNIQUE(word_list_id, word_id)
     )`);
 
+    // Reading Practice History
+    db.run(`CREATE TABLE IF NOT EXISTS reading_practice_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        word_id INTEGER NOT NULL,
+        practice_count INTEGER DEFAULT 1,
+        last_practiced_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(word_id) REFERENCES words(id),
+        UNIQUE(user_id, word_id)
+    )`);
+
+    // Reading Practice Favorites
+    db.run(`CREATE TABLE IF NOT EXISTS reading_favorites (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        word_id INTEGER NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(word_id) REFERENCES words(id),
+        UNIQUE(user_id, word_id)
+    )`);
+
     // Seed Data with UPSERT - delay to ensure migration completes
     setTimeout(() => {
         const stmt = db.prepare(`

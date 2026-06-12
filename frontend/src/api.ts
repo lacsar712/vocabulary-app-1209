@@ -65,4 +65,52 @@ export interface WordListFormData {
     description: string;
 }
 
+export interface ReadingWord {
+    id: number;
+    word: string;
+    pronunciation: string;
+    pos: string;
+    definition: string;
+    example: string;
+    rank: number;
+    frequency: number;
+    difficulty_level: number;
+    is_favorited: number;
+    practice_count: number;
+}
+
+export interface ReadingStats {
+    practiced_today: number;
+    total_practices: number;
+    total_favorites: number;
+}
+
+export const readingApi = {
+    getRandomExample: (wordListId?: number, excludeWordId?: number) =>
+        api.get<ReadingWord>('/reading/random', { 
+            params: { 
+                word_list_id: wordListId, 
+                exclude_word_id: excludeWordId 
+            } 
+        }),
+    
+    getWordExample: (wordId: number) =>
+        api.get<ReadingWord>(`/reading/word/${wordId}`),
+    
+    recordPractice: (wordId: number) =>
+        api.post<{ success: boolean; practice_count: number }>('/reading/record', { word_id: wordId }),
+    
+    getFavorites: () =>
+        api.get<ReadingWord[]>('/reading/favorites'),
+    
+    addFavorite: (wordId: number) =>
+        api.post<{ success: boolean; is_favorited: number; message: string }>(`/reading/favorites/${wordId}`),
+    
+    removeFavorite: (wordId: number) =>
+        api.delete<{ success: boolean; is_favorited: number; message: string }>(`/reading/favorites/${wordId}`),
+    
+    getStats: () =>
+        api.get<ReadingStats>('/reading/stats'),
+};
+
 export default api;
