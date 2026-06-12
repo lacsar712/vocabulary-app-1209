@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useWordList } from '../context/WordListContext';
-import api from '../api';
-import type { NewAchievement } from '../api';
-import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame } from 'lucide-react';
+import api, { etymologyApi } from '../api';
+import type { NewAchievement, EtymologyWordCheckResponse } from '../api';
+import { CheckCircle, BarChart2, Book, Volume2, LogOut, RefreshCw, Calendar, Trophy, Award, ListTodo, X, Play, Sparkles, Mic, Flame, BookOpen, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import LearningCalendar from '../components/LearningCalendar';
@@ -47,7 +47,22 @@ const Dashboard: React.FC = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [newAchievements, setNewAchievements] = useState<NewAchievement[]>([]);
     const [showListComplete, setShowListComplete] = useState(false);
+    const [etymologyCheck, setEtymologyCheck] = useState<EtymologyWordCheckResponse | null>(null);
+    const [checkingEtymology, setCheckingEtymology] = useState(false);
     const navigate = useNavigate();
+
+    const checkEtymology = useCallback(async (wordId: number) => {
+        setCheckingEtymology(true);
+        try {
+            const res = await etymologyApi.getEtymologyByWordId(wordId);
+            setEtymologyCheck(res.data);
+        } catch (e) {
+            console.error('Failed to check etymology:', e);
+            setEtymologyCheck(null);
+        } finally {
+            setCheckingEtymology(false);
+        }
+    }, []);
 
     const fetchRecommendation = async () => {
         try {
@@ -57,6 +72,11 @@ const Dashboard: React.FC = () => {
             }
             const res = await api.get('/recommend', { params });
             setWord(res.data);
+            setEtymologyCheck(null);
+
+            if (res.data && !('message' in res.data) && res.data.id) {
+                checkEtymology(res.data.id);
+            }
 
             if (res.data.list_completed && activeList) {
                 setShowListComplete(true);
@@ -323,7 +343,7 @@ const Dashboard: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="space-y-8 mb-12">
+                                <div className="space-y-6 mb-8">
                                     <div>
                                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">释义</h3>
                                         <p className="text-2xl text-slate-200 font-light leading-relaxed">{word.definition}</p>
@@ -333,6 +353,93 @@ const Dashboard: React.FC = () => {
                                         <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">例句</h3>
                                         <p className="text-xl text-indigo-200 italic font-serif">"{word.example}"</p>
                                     </div>
+
+                                    <AnimatePresence mode="wait">
+                                        {checkingEtymology ? (
+                                            <motion.div
+                                                key="loading"
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                exit={{ opacity: 0, height: 0 }}
+                                                className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 p-4 rounded-xl border border-amber-500/20"
+                                            >
+                                                <div className="flex items-center gap-2 text-amber-400">
+                                                    <BookOpen size={18} className="animate-pulse" />
+                                                    <span className="text-sm">正在查询词源信息...</span>
+                                                </div>
+                                            </motion.div>
+                                        ) : etymologyCheck?.has_etymology ? (
+                                            <motion.div
+                                                key="has-etymology"
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="bg-gradient-to-r from-primary/15 via-secondary/10 to-accent/15 p-5 rounded-xl border border-primary/30 hover:border-primary/50 transition cursor-pointer group"
+                                                onClick={() => navigate(`/etymology/${etymologyCheck.id}`)}
+                                            >
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <BookOpen size={18} className="text-primary" />
+                                                            <h4 className="text-sm font-bold text-primary">词源百科</h4>
+                                                            <span className="text-xs px-2 py-0.5 bg-primary/20 text-primary rounded-full">
+                                                                {etymologyCheck.language_origin}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-slate-300 text-sm line-clamp-2 group-hover:text-white transition">
+                                                            {etymologyCheck.root_meaning}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 text-primary text-sm font-medium">
+                                                        查看详情
+                                                        <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ) : etymologyCheck && !etymologyCheck.has_etymology ? (
+                                            <motion.div
+                                                key="no-etymology"
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                className="bg-slate-800/50 p-5 rounded-xl border border-slate-700/50"
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <Info size={18} className="text-slate-500 mt-0.5 shrink-0" />
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <h4 className="text-sm font-bold text-slate-400">暂无词源信息</h4>
+                                                        </div>
+                                                        {etymologyCheck.recommendations && etymologyCheck.recommendations.length > 0 && (
+                                                            <div>
+                                                                <p className="text-slate-500 text-xs mb-3">推荐同难度下有词源的单词：</p>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {etymologyCheck.recommendations.map((rec) => (
+                                                                        <button
+                                                                            key={rec.id}
+                                                                            onClick={() => navigate(`/etymology/${rec.id}`)}
+                                                                            className="px-3 py-1 bg-slate-700/50 hover:bg-slate-700 text-slate-300 hover:text-white text-sm rounded-lg transition flex items-center gap-1"
+                                                                        >
+                                                                            <span className="font-mono">{rec.word}</span>
+                                                                            <BookOpen size={12} className="text-primary" />
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            onClick={() => navigate('/etymology')}
+                                                            className="mt-3 text-xs text-primary hover:text-indigo-400 font-medium flex items-center gap-1"
+                                                        >
+                                                            浏览全部词源 →
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        ) : null}
+                                    </AnimatePresence>
                                 </div>
 
                                 <div className="flex gap-4">
@@ -439,6 +546,14 @@ const Dashboard: React.FC = () => {
                                     <span className="w-2 h-2 rounded-full bg-accent"></span>
                                     <Mic size={18} />
                                     跟读练习
+                                </button>
+                                <button
+                                    onClick={() => navigate('/etymology')}
+                                    className="w-full text-left p-3 rounded-lg bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/30 transition text-white flex items-center gap-3"
+                                >
+                                    <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                                    <BookOpen size={18} />
+                                    词源百科
                                 </button>
                                 <button
                                     onClick={() => navigate('/word-lists')}

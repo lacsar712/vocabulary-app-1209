@@ -178,4 +178,124 @@ export const dailyChallengeApi = {
         api.get<DailyChallengeStats>('/daily-challenge/stats'),
 };
 
+// ==================== Etymology Types ====================
+
+export interface EtymologyComponent {
+    part: string;
+    meaning: string;
+    origin: string;
+}
+
+export interface EtymologyRoot {
+    id: number;
+    root: string;
+    meaning: string;
+    language: string;
+    example_count: number;
+    created_at: string;
+}
+
+export interface EtymologyEntry {
+    id: number;
+    word_id: number;
+    word: string;
+    language_origin: string;
+    root_meaning: string;
+    components: EtymologyComponent[];
+    explanation: string;
+    related_words: string[];
+    word_cloud: string[];
+    difficulty_level: number;
+    created_at: string;
+    is_favorited: number;
+    pronunciation?: string;
+    pos?: string;
+    definition?: string;
+    example?: string;
+    rank?: number;
+    frequency?: number;
+    favorited_at?: string;
+}
+
+export interface EtymologyListResponse {
+    total: number;
+    limit: number;
+    offset: number;
+    data: EtymologyEntry[];
+}
+
+export interface EtymologyWordCheckResponse {
+    has_etymology: boolean;
+    message?: string;
+    recommendations?: EtymologyEntry[];
+    id?: number;
+    word_id?: number;
+    word?: string;
+    language_origin?: string;
+    root_meaning?: string;
+    components?: EtymologyComponent[];
+    explanation?: string;
+    related_words?: string[];
+    word_cloud?: string[];
+    difficulty_level?: number;
+    is_favorited?: number;
+    pronunciation?: string;
+    pos?: string;
+    definition?: string;
+}
+
+export interface EtymologyStats {
+    total_entries: number;
+    total_roots: number;
+    favorite_count: number;
+    learned_with_etymology: number;
+}
+
+export interface EtymologyRootEntriesResponse {
+    root: string;
+    total: number;
+    data: EtymologyEntry[];
+}
+
+export interface EtymologyFavoritesResponse {
+    total: number;
+    data: EtymologyEntry[];
+}
+
+export const etymologyApi = {
+    getEtymologyList: (params?: {
+        q?: string;
+        difficulty?: string;
+        root?: string;
+        limit?: number;
+        offset?: number;
+        sort_by?: 'difficulty' | 'alpha' | 'newest';
+    }) =>
+        api.get<EtymologyListResponse>('/etymology', { params }),
+    
+    getEtymologyDetail: (id: number) =>
+        api.get<EtymologyEntry>(`/etymology/${id}`),
+    
+    getEtymologyByWordId: (wordId: number) =>
+        api.get<EtymologyWordCheckResponse>(`/etymology/word/${wordId}`),
+    
+    getRoots: (params?: { language?: string; limit?: number }) =>
+        api.get<EtymologyRoot[]>('/etymology/roots/list', { params }),
+    
+    getRootEntries: (root: string, params?: { limit?: number; offset?: number }) =>
+        api.get<EtymologyRootEntriesResponse>(`/etymology/roots/${encodeURIComponent(root)}`, { params }),
+    
+    getFavorites: (params?: { limit?: number; offset?: number }) =>
+        api.get<EtymologyFavoritesResponse>('/etymology/favorites/list', { params }),
+    
+    addFavorite: (id: number) =>
+        api.post<{ success: boolean; is_favorited: number; message: string }>(`/etymology/favorites/${id}`),
+    
+    removeFavorite: (id: number) =>
+        api.delete<{ success: boolean; is_favorited: number; message: string }>(`/etymology/favorites/${id}`),
+    
+    getStats: () =>
+        api.get<EtymologyStats>('/etymology/stats/summary'),
+};
+
 export default api;
