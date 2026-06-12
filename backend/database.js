@@ -153,6 +153,28 @@ db.serialize(() => {
         UNIQUE(user_id, achievement_id)
     )`);
 
+    // Word Lists (Custom Vocabulary Lists)
+    db.run(`CREATE TABLE IF NOT EXISTS word_lists (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    )`);
+
+    // Word List Items (Many-to-Many relationship)
+    db.run(`CREATE TABLE IF NOT EXISTS word_list_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        word_list_id INTEGER NOT NULL,
+        word_id INTEGER NOT NULL,
+        added_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(word_list_id) REFERENCES word_lists(id) ON DELETE CASCADE,
+        FOREIGN KEY(word_id) REFERENCES words(id),
+        UNIQUE(word_list_id, word_id)
+    )`);
+
     // Seed Data with UPSERT - delay to ensure migration completes
     setTimeout(() => {
         const stmt = db.prepare(`

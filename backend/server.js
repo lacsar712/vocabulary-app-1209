@@ -210,71 +210,6 @@ app.post('/api/test/submit', authenticate, (req, res) => {
     });
 });
 
-// Recommendation Engine (i+1) - Enhanced with frequency and learning history
-app.get('/api/recommend', authenticate, (req, res) => {
-    db.get("SELECT vocab_size FROM users WHERE id = ?", [req.user.id], (err, user) => {
-        if (!user) return res.status(404).json({ error: "用户未找到" });
-
-        const i = user.vocab_size;
-
-        // Enhanced recommendation algorithm:
-        // 1. Find words slightly above user's level (i+1 principle)
-        // 2. Prioritize high-frequency words (more useful in daily life)
-        // 3. Consider words that were skipped before (give second chance after time)
-        // 4. Exclude recently learned and recently skipped words
-
-        const sql = `
-            SELECT w.*,
-                   CASE
-                       WHEN w.rank BETWEEN ? AND ? THEN 100  -- Sweet spot: i to i+1500
-                       WHEN w.rank BETWEEN ? AND ? THEN 80   -- Slightly above: i+1500 to i+3000
-                       WHEN w.rank < ? THEN 60               -- Below level (review)
-                       ELSE 40                               -- Much higher
-                   END as level_score,
-                   (w.frequency * 10) as frequency_score
-            FROM words w
-            WHERE w.id NOT IN (
-                SELECT word_id FROM learning_history
-                WHERE user_id = ? AND status = 'learned'
-            )
-            AND w.id NOT IN (
-                SELECT word_id FROM learning_history
-                WHERE user_id = ? AND status = 'skipped'
-                AND updated_at > datetime('now', '-1 hour')
-            )
-            ORDER BY (level_score + frequency_score) DESC, w.rank ASC
-            LIMIT 1
-        `;
-
-        const params = [
-            i, i + 1500,           // Sweet spot range
-            i + 1500, i + 3000,   // Slightly above range
-            i,                     // Below level threshold
-            req.user.id,          // For learned exclusion
-            req.user.id           // For recent skip exclusion
-        ];
-
-        db.get(sql, params, (err, word) => {
-            if (err) return res.status(500).json({ error: err.message });
-            if (!word) {
-                // Fallback: return any unlearned word not recently skipped
-                db.get(`
-                    SELECT * FROM words
-                    WHERE id NOT IN (SELECT word_id FROM learning_history WHERE user_id = ? AND status = 'learned')
-                    AND id NOT IN (SELECT word_id FROM learning_history WHERE user_id = ? AND status = 'skipped' AND updated_at > datetime('now', '-1 hour'))
-                    ORDER BY frequency DESC, rank ASC
-                    LIMIT 1
-                `, [req.user.id, req.user.id], (err, fallback) => {
-                    if (fallback) return res.json(fallback);
-                    return res.json({ message: "暂无新单词. 您已掌握所有词汇!" });
-                });
-                return;
-            }
-            res.json(word);
-        });
-    });
-});
-
 // Get multiple recommendations for batch learning
 app.get('/api/recommend/batch', authenticate, (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
@@ -472,6 +407,393 @@ app.post('/api/achievements/mark-read', authenticate, (req, res) => {
         }
         console.log('POST /api/achievements/mark-read success, changed:', result.changed);
         res.json(result);
+    });
+});
+
+// ==================== Word Lists (Custom Vocabulary) API ====================
+
+// Get all word lists for current user with word count and progress
+app.get('/api/word-lists', authenticate, (req, res) => {
+    const sql = `
+        SELECT 
+            wl.*,
+            (SELECT COUNT(*) FROM word_list_items wli WHERE wli.word_list_id = wl.id) as word_count,
+            (SELECT COUNT(*) FROM word_list_items wli 
+             JOIN learning_history lh ON wli.word_id = lh.word_id 
+             WHERE wli.word_list_id = wl.id 
+             AND lh.user_id = ? AND lh.status = 'learned') as learned_count
+        FROM word_lists wl
+        WHERE wl.user_id = ?
+        ORDER BY wl.updated_at DESC
+    `;
+    db.all(sql, [req.user.id, req.user.id], (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// Get a single word list with details
+app.get('/api/word-lists/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const sql = `
+        SELECT 
+            wl.*,
+            (SELECT COUNT(*) FROM word_list_items wli WHERE wli.word_list_id = wl.id) as word_count,
+            (SELECT COUNT(*) FROM word_list_items wli 
+             JOIN learning_history lh ON wli.word_id = lh.word_id 
+             WHERE wli.word_list_id = wl.id 
+             AND lh.user_id = wl.user_id AND lh.status = 'learned') as learned_count
+        FROM word_lists wl
+        WHERE wl.id = ? AND wl.user_id = ?
+    `;
+    db.get(sql, [id, req.user.id], (err, row) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!row) return res.status(404).json({ error: '词单不存在' });
+        res.json(row);
+    });
+});
+
+// Create a new word list
+app.post('/api/word-lists', authenticate, (req, res) => {
+    const { name, description } = req.body;
+    if (!name || name.trim() === '') {
+        return res.status(400).json({ error: '词单名称不能为空' });
+    }
+    const sql = `INSERT INTO word_lists (user_id, name, description) VALUES (?, ?, ?)`;
+    db.run(sql, [req.user.id, name.trim(), description || ''], function (err) {
+        if (err) return res.status(500).json({ error: err.message });
+        const newId = this.lastID;
+        db.get(`SELECT * FROM word_lists WHERE id = ?`, [newId], (err, row) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ ...row, word_count: 0, learned_count: 0 });
+        });
+    });
+});
+
+// Update a word list (name, description)
+app.put('/api/word-lists/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    const { name, description } = req.body;
+    
+    db.get(`SELECT * FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        const newName = name !== undefined ? name.trim() : list.name;
+        const newDesc = description !== undefined ? description : list.description;
+        
+        if (!newName || newName === '') {
+            return res.status(400).json({ error: '词单名称不能为空' });
+        }
+        
+        db.run(
+            `UPDATE word_lists SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [newName, newDesc, id],
+            (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                db.get(`SELECT * FROM word_lists WHERE id = ?`, [id], (err, row) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    res.json(row);
+                });
+            }
+        );
+    });
+});
+
+// Delete a word list
+app.delete('/api/word-lists/:id', authenticate, (req, res) => {
+    const { id } = req.params;
+    db.get(`SELECT * FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        db.run(`DELETE FROM word_list_items WHERE word_list_id = ?`, [id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            db.run(`DELETE FROM word_lists WHERE id = ?`, [id], (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ success: true });
+            });
+        });
+    });
+});
+
+// Copy (duplicate) a word list
+app.post('/api/word-lists/:id/copy', authenticate, (req, res) => {
+    const { id } = req.params;
+    db.get(`SELECT * FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        const newName = `${list.name} (副本)`;
+        db.run(
+            `INSERT INTO word_lists (user_id, name, description) VALUES (?, ?, ?)`,
+            [req.user.id, newName, list.description],
+            function (err) {
+                if (err) return res.status(500).json({ error: err.message });
+                const newListId = this.lastID;
+                
+                db.all(`SELECT word_id FROM word_list_items WHERE word_list_id = ?`, [id], (err, items) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    
+                    if (items.length > 0) {
+                        const stmt = db.prepare(`INSERT INTO word_list_items (word_list_id, word_id) VALUES (?, ?)`);
+                        items.forEach(item => stmt.run(newListId, item.word_id));
+                        stmt.finalize();
+                    }
+                    
+                    db.get(`
+                        SELECT 
+                            wl.*,
+                            (SELECT COUNT(*) FROM word_list_items wli WHERE wli.word_list_id = wl.id) as word_count,
+                            (SELECT COUNT(*) FROM word_list_items wli 
+                             JOIN learning_history lh ON wli.word_id = lh.word_id 
+                             WHERE wli.word_list_id = wl.id 
+                             AND lh.user_id = wl.user_id AND lh.status = 'learned') as learned_count
+                        FROM word_lists wl
+                        WHERE wl.id = ?
+                    `, [newListId], (err, row) => {
+                        if (err) return res.status(500).json({ error: err.message });
+                        res.json(row);
+                    });
+                });
+            }
+        );
+    });
+});
+
+// Get words in a word list with optional sorting
+app.get('/api/word-lists/:id/words', authenticate, (req, res) => {
+    const { id } = req.params;
+    const { sort = 'difficulty' } = req.query; // 'difficulty' or 'alpha'
+    
+    db.get(`SELECT id FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        const orderClause = sort === 'alpha' 
+            ? 'w.word ASC' 
+            : 'w.difficulty_level ASC, w.rank ASC';
+        
+        const sql = `
+            SELECT w.*, 
+                   lh.status as learn_status,
+                   lh.updated_at as learned_at
+            FROM word_list_items wli
+            JOIN words w ON wli.word_id = w.id
+            LEFT JOIN learning_history lh ON w.id = lh.word_id 
+                AND lh.user_id = ? 
+                AND lh.status = 'learned'
+            WHERE wli.word_list_id = ?
+            ORDER BY ${orderClause}
+        `;
+        db.all(sql, [req.user.id, id], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        });
+    });
+});
+
+// Add a word to a word list
+app.post('/api/word-lists/:id/words/:wordId', authenticate, (req, res) => {
+    const { id, wordId } = req.params;
+    db.get(`SELECT id FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        db.get(`SELECT id FROM words WHERE id = ?`, [wordId], (err, word) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!word) return res.status(404).json({ error: '单词不存在' });
+            
+            db.run(
+                `INSERT OR IGNORE INTO word_list_items (word_list_id, word_id) VALUES (?, ?)`,
+                [id, wordId],
+                (err) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    db.run(`UPDATE word_lists SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+                    res.json({ success: true });
+                }
+            );
+        });
+    });
+});
+
+// Remove a word from a word list
+app.delete('/api/word-lists/:id/words/:wordId', authenticate, (req, res) => {
+    const { id, wordId } = req.params;
+    db.get(`SELECT id FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        db.run(
+            `DELETE FROM word_list_items WHERE word_list_id = ? AND word_id = ?`,
+            [id, wordId],
+            (err) => {
+                if (err) return res.status(500).json({ error: err.message });
+                db.run(`UPDATE word_lists SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [id]);
+                res.json({ success: true });
+            }
+        );
+    });
+});
+
+// Search words globally (for adding to word lists)
+app.get('/api/words/search', authenticate, (req, res) => {
+    const { q = '', exclude_list_id, limit = 20 } = req.query;
+    const searchTerm = `%${q}%`;
+    
+    let excludeSql = '';
+    let params = [searchTerm, searchTerm];
+    
+    if (exclude_list_id) {
+        excludeSql = `AND w.id NOT IN (SELECT word_id FROM word_list_items WHERE word_list_id = ?)`;
+        params.push(exclude_list_id);
+    }
+    
+    params.push(limit);
+    
+    const sql = `
+        SELECT w.* 
+        FROM words w
+        WHERE (w.word LIKE ? OR w.definition LIKE ?)
+        ${excludeSql}
+        ORDER BY 
+            CASE WHEN w.word LIKE ? THEN 0 ELSE 1 END,
+            w.frequency DESC,
+            w.rank ASC
+        LIMIT ?
+    `;
+    
+    // Add the second searchTerm for word match priority
+    params.splice(2, 0, searchTerm);
+    
+    db.all(sql, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows);
+    });
+});
+
+// Get random words from a word list for quiz
+app.get('/api/word-lists/:id/quiz', authenticate, (req, res) => {
+    const { id } = req.params;
+    const { limit = 10 } = req.query;
+    
+    db.get(`SELECT id FROM word_lists WHERE id = ? AND user_id = ?`, [id, req.user.id], (err, list) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (!list) return res.status(404).json({ error: '词单不存在' });
+        
+        const sql = `
+            SELECT w.*
+            FROM word_list_items wli
+            JOIN words w ON wli.word_id = w.id
+            WHERE wli.word_list_id = ?
+            ORDER BY RANDOM()
+            LIMIT ?
+        `;
+        db.all(sql, [id, limit], (err, rows) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(rows);
+        });
+    });
+});
+
+// Modified recommend endpoint - supports word list mode
+app.get('/api/recommend', authenticate, (req, res) => {
+    const { word_list_id } = req.query;
+    
+    // If word_list_id is provided, recommend only from that list
+    if (word_list_id) {
+        db.get(`SELECT id, user_id FROM word_lists WHERE id = ?`, [word_list_id], (err, list) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!list) return res.status(404).json({ error: '词单不存在' });
+            if (list.user_id !== req.user.id) return res.status(403).json({ error: '无权访问此词单' });
+            
+            // Check if list has words
+            db.get(`SELECT COUNT(*) as count FROM word_list_items WHERE word_list_id = ?`, [word_list_id], (err, countResult) => {
+                if (err) return res.status(500).json({ error: err.message });
+                if (countResult.count === 0) {
+                    return res.json({ message: "该词单暂无单词，请先添加单词。", empty_list: true });
+                }
+                
+                // Recommend unlearned word from the list, ordered by difficulty
+                const sql = `
+                    SELECT w.*
+                    FROM word_list_items wli
+                    JOIN words w ON wli.word_id = w.id
+                    WHERE wli.word_list_id = ?
+                    AND w.id NOT IN (
+                        SELECT word_id FROM learning_history
+                        WHERE user_id = ? AND status = 'learned'
+                    )
+                    ORDER BY w.difficulty_level ASC, w.rank ASC
+                    LIMIT 1
+                `;
+                db.get(sql, [word_list_id, req.user.id], (err, word) => {
+                    if (err) return res.status(500).json({ error: err.message });
+                    if (!word) {
+                        // All words in list are learned
+                        return res.json({ message: "恭喜！该词单的所有单词您都已掌握！", list_completed: true });
+                    }
+                    res.json(word);
+                });
+            });
+        });
+        return;
+    }
+    
+    // Original recommendation logic
+    db.get("SELECT vocab_size FROM users WHERE id = ?", [req.user.id], (err, user) => {
+        if (!user) return res.status(404).json({ error: "用户未找到" });
+
+        const i = user.vocab_size;
+
+        const sql = `
+            SELECT w.*,
+                   CASE
+                       WHEN w.rank BETWEEN ? AND ? THEN 100
+                       WHEN w.rank BETWEEN ? AND ? THEN 80
+                       WHEN w.rank < ? THEN 60
+                       ELSE 40
+                   END as level_score,
+                   (w.frequency * 10) as frequency_score
+            FROM words w
+            WHERE w.id NOT IN (
+                SELECT word_id FROM learning_history
+                WHERE user_id = ? AND status = 'learned'
+            )
+            AND w.id NOT IN (
+                SELECT word_id FROM learning_history
+                WHERE user_id = ? AND status = 'skipped'
+                AND updated_at > datetime('now', '-1 hour')
+            )
+            ORDER BY (level_score + frequency_score) DESC, w.rank ASC
+            LIMIT 1
+        `;
+
+        const params = [
+            i, i + 1500,
+            i + 1500, i + 3000,
+            i,
+            req.user.id,
+            req.user.id
+        ];
+
+        db.get(sql, params, (err, word) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (!word) {
+                db.get(`
+                    SELECT * FROM words
+                    WHERE id NOT IN (SELECT word_id FROM learning_history WHERE user_id = ? AND status = 'learned')
+                    AND id NOT IN (SELECT word_id FROM learning_history WHERE user_id = ? AND status = 'skipped' AND updated_at > datetime('now', '-1 hour'))
+                    ORDER BY frequency DESC, rank ASC
+                    LIMIT 1
+                `, [req.user.id, req.user.id], (err, fallback) => {
+                    if (fallback) return res.json(fallback);
+                    return res.json({ message: "暂无新单词. 您已掌握所有词汇!" });
+                });
+                return;
+            }
+            res.json(word);
+        });
     });
 });
 

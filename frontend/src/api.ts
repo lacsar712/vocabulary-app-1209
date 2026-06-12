@@ -35,4 +35,34 @@ export interface NewAchievement {
     icon: string;
 }
 
+export interface Word {
+    id: number;
+    word: string;
+    pronunciation: string;
+    pos: string;
+    definition: string;
+    example: string;
+    rank: number;
+    frequency: number;
+    difficulty_level: number;
+    learn_status?: string | null;
+    learned_at?: string | null;
+}
+
+export interface WordList {
+    id: number;
+    user_id: number;
+    name: string;
+    description: string;
+    created_at: string;
+    updated_at: string;
+    word_count: number;
+    learned_count: number;
+}
+
+export interface WordListFormData {
+    name: string;
+    description: string;
+}
+
 export default api;
