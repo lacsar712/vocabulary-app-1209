@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('./database');
 const achievements = require('./achievements');
+const vocabEstimation = require('./services/vocabEstimation');
 const app = express();
 const PORT = 3000;
 const SECRET_KEY = "supersecretkey_vocabulary_1209"; // In prod, use .env
@@ -124,53 +125,8 @@ app.post('/api/test/submit', authenticate, (req, res) => {
         return res.status(400).json({ error: "No answers provided" });
     }
 
-    // Binary search estimation using Item Response Theory (IRT) simplified
-    // Find the rank threshold where user transitions from knowing to not knowing
-    const sortedAnswers = [...answers].sort((a, b) => a.rank - b.rank);
-
-    let correctByRank = sortedAnswers.map(a => ({
-        rank: a.rank,
-        correct: a.isCorrect ? 1 : 0
-    }));
-
-    // Calculate weighted average based on correct/incorrect boundary
-    // Words answered correctly contribute their rank, incorrect ones don't
-    let totalWeight = 0;
-    let weightedSum = 0;
-
-    correctByRank.forEach((item, index) => {
-        const weight = item.correct ? 1.5 : 0.5;
-        weightedSum += item.rank * weight * (item.correct ? 1 : 0.3);
-        totalWeight += weight * (item.correct ? 1 : 0.3);
-    });
-
-    // Find the highest rank where user got correct
-    const correctAnswers = sortedAnswers.filter(a => a.isCorrect);
-    const incorrectAnswers = sortedAnswers.filter(a => !a.isCorrect);
-
-    let estimatedVocab;
-
-    if (correctAnswers.length === 0) {
-        // All wrong - estimate at lowest rank
-        estimatedVocab = Math.min(...sortedAnswers.map(a => a.rank)) * 0.5;
-    } else if (incorrectAnswers.length === 0) {
-        // All correct - estimate above highest tested rank
-        estimatedVocab = Math.max(...sortedAnswers.map(a => a.rank)) * 1.2;
-    } else {
-        // Mixed results - find the boundary
-        const maxCorrectRank = Math.max(...correctAnswers.map(a => a.rank));
-        const minIncorrectRank = Math.min(...incorrectAnswers.map(a => a.rank));
-
-        // Estimate is between highest correct and lowest incorrect
-        // Weight towards correct answers
-        const correctRatio = correctAnswers.length / answers.length;
-        estimatedVocab = maxCorrectRank * 0.7 + minIncorrectRank * 0.3;
-
-        // Adjust based on overall performance
-        estimatedVocab = estimatedVocab * (0.8 + correctRatio * 0.4);
-    }
-
-    estimatedVocab = Math.round(Math.max(100, Math.min(10000, estimatedVocab)));
+    const testResult = vocabEstimation.estimateVocabulary(answers);
+    const estimatedVocab = testResult.vocab_size;
 
     // Record test history
     const stmt = db.prepare(`
@@ -190,13 +146,6 @@ app.post('/api/test/submit', authenticate, (req, res) => {
         // Update user vocab size
         db.run("UPDATE users SET vocab_size = ? WHERE id = ?", [estimatedVocab, req.user.id], (err) => {
             if (err) return res.status(500).json({ error: err.message });
-            
-            const testResult = {
-                vocab_size: estimatedVocab,
-                correct_count: correctAnswers.length,
-                total_questions: answers.length,
-                accuracy: Math.round((correctAnswers.length / answers.length) * 100)
-            };
             
             let allNewAchievements = [];
             let checksDone = 0;
