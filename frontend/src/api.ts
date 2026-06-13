@@ -1,16 +1,122 @@
-import axios from 'axios';
+import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
+
+export type ErrorType = 'network' | 'timeout' | 'server' | 'business' | 'auth';
+
+type ErrorHandler = (type: ErrorType, message: string) => void;
+type LogoutHandler = () => void;
+type NavigateHandler = (path: string) => void;
+
+let globalErrorHandler: ErrorHandler | null = null;
+let globalLogoutHandler: LogoutHandler | null = null;
+let globalNavigateHandler: NavigateHandler | null = null;
+
+export function registerErrorHandler(handler: ErrorHandler) {
+    globalErrorHandler = handler;
+}
+
+export function registerLogoutHandler(handler: LogoutHandler) {
+    globalLogoutHandler = handler;
+}
+
+export function registerNavigateHandler(handler: NavigateHandler) {
+    globalNavigateHandler = handler;
+}
+
+const TOKEN_KEY = 'token';
+
+function clearAuthInfo() {
+    localStorage.removeItem(TOKEN_KEY);
+    globalLogoutHandler?.();
+}
+
+function redirectToLogin() {
+    if (globalNavigateHandler) {
+        globalNavigateHandler('/login');
+    } else {
+        window.location.href = '/login';
+    }
+}
+
+function getBusinessMessage(err: AxiosError<{ error?: string; message?: string; msg?: string }>): string {
+    const data = err.response?.data;
+    return data?.error || data?.message || data?.msg || '操作失败，请稍后重试';
+}
+
+function classifyError(err: AxiosError<{ error?: string; message?: string; msg?: string }>): {
+    type: ErrorType;
+    message: string;
+} {
+    if (!err.response) {
+        if (err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout')) {
+            return { type: 'timeout', message: '请求超时，请检查网络后重试' };
+        }
+        if (err.code === 'ERR_NETWORK' || !navigator.onLine) {
+            return { type: 'network', message: '网络连接异常，请检查网络设置' };
+        }
+        return { type: 'network', message: '网络连接异常，请检查网络设置' };
+    }
+
+    const status = err.response.status;
+
+    if (status === 401) {
+        return { type: 'auth', message: '登录已失效，请重新登录' };
+    }
+
+    if (status === 403) {
+        return { type: 'business', message: '您没有权限执行此操作' };
+    }
+
+    if (status === 404) {
+        return { type: 'business', message: '请求的资源不存在' };
+    }
+
+    if (status === 429) {
+        return { type: 'business', message: '请求过于频繁，请稍后再试' };
+    }
+
+    if (status >= 500) {
+        return { type: 'server', message: `服务器开小差了 (${status})，请稍后重试` };
+    }
+
+    if (status >= 400) {
+        return { type: 'business', message: getBusinessMessage(err) };
+    }
+
+    return { type: 'network', message: '请求失败，请稍后重试' };
+}
 
 const api = axios.create({
     baseURL: '/api',
+    timeout: 15000,
 });
 
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(
+    (config: InternalAxiosRequestConfig) => {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (token && config.headers) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    },
+    (err) => Promise.reject(err)
+);
+
+api.interceptors.response.use(
+    (response) => response,
+    (err: AxiosError<{ error?: string; message?: string; msg?: string }>) => {
+        const { type, message } = classifyError(err);
+
+        if (type === 'auth') {
+            clearAuthInfo();
+            globalErrorHandler?.(type, message);
+            redirectToLogin();
+            return Promise.reject(err);
+        }
+
+        globalErrorHandler?.(type, message);
+        return Promise.reject(err);
     }
-    return config;
-});
+);
 
 export interface Achievement {
     id: string;

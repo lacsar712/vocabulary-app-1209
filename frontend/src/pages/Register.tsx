@@ -6,7 +6,6 @@ import { UserPlus } from 'lucide-react';
 const Register: React.FC = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
     const navigate = useNavigate();
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -14,8 +13,7 @@ const Register: React.FC = () => {
         try {
             await api.post('/register', { username, password });
             navigate('/login');
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Registration failed');
+        } catch {
         }
     };
 
@@ -30,8 +28,6 @@ const Register: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-bold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-pink-300 to-purple-300">加入我们</h2>
                 <p className="text-slate-400 text-center mb-8">今天就开始积累您的词汇量</p>
-
-                {error && <div className="bg-red-500/20 text-red-200 p-3 rounded-lg mb-4 text-center text-sm">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>

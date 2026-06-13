@@ -1,6 +1,9 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WordListProvider } from './context/WordListContext';
+import { ToastProvider } from './context/ToastContext';
+import { registerNavigateHandler } from './api';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -17,6 +20,22 @@ import NoPermissionPage from './pages/NoPermissionPage';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminWordsPage from './pages/AdminWordsPage';
 
+const NavigateRegistrar: React.FC = () => {
+  const navigate = useNavigate();
+  const registered = useRef(false);
+
+  useEffect(() => {
+    if (!registered.current) {
+      registered.current = true;
+      registerNavigateHandler((path: string) => {
+        navigate(path, { replace: true });
+      });
+    }
+  }, [navigate]);
+
+  return null;
+};
+
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated } = useAuth();
   return isAuthenticated ? children : <Navigate to="/login" />;
@@ -31,10 +50,12 @@ const AdminRoute = ({ children }: { children: React.ReactElement }) => {
 
 function App() {
   return (
-    <AuthProvider>
-      <WordListProvider>
-        <Router>
-          <div className="min-h-screen bg-background text-slate-100 font-sans">
+    <ToastProvider>
+      <AuthProvider>
+        <WordListProvider>
+          <Router>
+            <NavigateRegistrar />
+            <div className="min-h-screen bg-background text-slate-100 font-sans">
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -105,10 +126,11 @@ function App() {
                 </ProtectedRoute>
               } />
             </Routes>
-          </div>
-        </Router>
-      </WordListProvider>
-    </AuthProvider>
+            </div>
+          </Router>
+        </WordListProvider>
+      </AuthProvider>
+    </ToastProvider>
   );
 }
 

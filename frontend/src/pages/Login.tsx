@@ -7,7 +7,6 @@ import { BookOpen } from 'lucide-react';
 const Login: React.FC = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -17,12 +16,11 @@ const Login: React.FC = () => {
             const res = await api.post('/login', { username, password });
             login(res.data.token, res.data.user);
             if (res.data.user.vocab_size === 0) {
-                navigate('/test'); // Redirect to test first
+                navigate('/test');
             } else {
-                navigate('/'); // Dashboard
+                navigate('/');
             }
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Login failed');
+        } catch {
         }
     };
 
@@ -37,8 +35,6 @@ const Login: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-bold text-center mb-2 bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-purple-300">欢迎回来</h2>
                 <p className="text-slate-400 text-center mb-8">继续您的词汇积累之旅</p>
-
-                {error && <div className="bg-red-500/20 text-red-200 p-3 rounded-lg mb-4 text-center text-sm">{error}</div>}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>

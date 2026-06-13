@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import api from '../api';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import api, { registerLogoutHandler } from '../api';
 
 interface User {
     id: number;
@@ -19,17 +19,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const TOKEN_KEY = 'token';
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const registered = useRef(false);
+
+    const logout = useCallback(() => {
+        localStorage.removeItem(TOKEN_KEY);
+        setUser(null);
+    }, []);
 
     useEffect(() => {
-        const token = localStorage.getItem('token');
+        if (!registered.current) {
+            registered.current = true;
+            registerLogoutHandler(() => {
+                logout();
+            });
+        }
+    }, [logout]);
+
+    useEffect(() => {
+        const token = localStorage.getItem(TOKEN_KEY);
         if (token) {
             api.get('/me').then(res => {
                 setUser(res.data);
             }).catch(() => {
-                localStorage.removeItem('token');
+                localStorage.removeItem(TOKEN_KEY);
             }).finally(() => setLoading(false));
         } else {
             setLoading(false);
@@ -37,13 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = (token: string, user: User) => {
-        localStorage.setItem('token', token);
+        localStorage.setItem(TOKEN_KEY, token);
         setUser(user);
-    };
-
-    const logout = () => {
-        localStorage.removeItem('token');
-        setUser(null);
     };
 
     const refreshUser = async () => {
