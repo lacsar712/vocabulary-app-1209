@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { readingApi, type ReadingWord } from '../api';
 import { 
     Volume2, Mic, Play, Pause, SkipForward, Heart, HeartOff, 
@@ -17,7 +16,6 @@ interface AudioLevel {
 const ReadingPracticePage: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const { user } = useAuth();
     
     const [currentWord, setCurrentWord] = useState<ReadingWord | null>(null);
     const [loading, setLoading] = useState(true);

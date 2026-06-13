@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X, Download, Copy, Palette, Eye, EyeOff, Share2, Clock, Award, BookOpen, Sparkles, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';

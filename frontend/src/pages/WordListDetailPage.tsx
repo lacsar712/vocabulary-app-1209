@@ -7,7 +7,7 @@ import ProgressRing from '../components/ProgressRing';
 import {
     ChevronLeft, Play, Search, Plus, X, Trash2, Volume2,
     SortAsc, TrendingUp, Shuffle, CheckCircle2, BookOpen,
-    Clock, Edit3, ArrowRight, HelpCircle
+    Clock, ArrowRight, HelpCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 

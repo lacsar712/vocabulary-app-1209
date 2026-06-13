@@ -11,7 +11,7 @@ interface CellState {
     letter: string;
     isActive: boolean;
     isRevealed: boolean;
-    checkResult: 'correct' | 'incorrect' | null;
+    checkResult: 'correct' | 'incorrect' | 'pending' | null;
 }
 
 const CrosswordPage: React.FC = () => {

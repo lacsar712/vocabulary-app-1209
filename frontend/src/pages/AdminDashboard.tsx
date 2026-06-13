@@ -182,7 +182,7 @@ const AdminDashboard: React.FC = () => {
                                                 borderRadius: '8px',
                                                 color: '#fff'
                                             }}
-                                            formatter={(value: number) => [`${value} 词`, '数量']}
+                                            formatter={(value: number | undefined) => [`${value ?? 0} 词`, '数量']}
                                         />
                                         <Bar dataKey="count" radius={[8, 8, 0, 0]}>
                                             {chartData.map((entry, index) => (
@@ -241,9 +241,9 @@ const AdminDashboard: React.FC = () => {
                                             {log.details && (
                                                 <p className="text-slate-400 text-xs mt-1 truncate">
                                                     {typeof log.details === 'string' ? log.details :
-                                                        log.details.word ||
-                                                        (log.details.count ? `${log.details.count} 个` : '') ||
-                                                        (log.details.success_count !== undefined ? `成功 ${log.details.success_count}，失败 ${log.details.error_count}` : '')}
+                                                        (log.details.word != null ? String(log.details.word) :
+                                                        log.details.count ? `${log.details.count} 个` :
+                                                        log.details.success_count !== undefined ? `成功 ${log.details.success_count}，失败 ${log.details.error_count}` : '')}
                                                 </p>
                                             )}
                                         </div>

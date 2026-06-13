@@ -146,8 +146,6 @@ const DailyChallengePage: React.FC = () => {
     };
 
     const renderQuestion = (question: ChallengeQuestion) => {
-        const typeInfo = QUESTION_TYPE_LABELS[question.type];
-
         if (question.type === 'word_choice') {
             return (
                 <div className="space-y-6">
